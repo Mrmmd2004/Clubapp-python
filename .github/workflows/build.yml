@@ -1,0 +1,34 @@
+name: Build Clubapp APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Aether core (Android arm64)
+        run: |
+          mkdir -p libs/arm64-v8a /tmp/aether
+          curl -fsSL -o /tmp/aether.tar.gz \
+            "https://github.com/CluvexStudio/Aether/releases/latest/download/aether-android-arm64.tar.gz"
+          tar -xzf /tmp/aether.tar.gz -C /tmp/aether
+          BIN=$(find /tmp/aether -type f -name aether | head -n1)
+          test -n "$BIN"
+          cp "$BIN" libs/arm64-v8a/libaether.so
+
+      - name: Build APK
+        id: buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          command: buildozer android debug
+          buildozer_version: stable
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Clubapp-apk
+          path: ${{ steps.buildozer.outputs.filename }}
