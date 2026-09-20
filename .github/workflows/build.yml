@@ -8,11 +8,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
       - name: Download Aether core (Android arm64)
         run: |
+          set -euo pipefail
           mkdir -p libs/arm64-v8a /tmp/aether
           curl -fsSL -o /tmp/aether.tar.gz \
             "https://github.com/CluvexStudio/Aether/releases/latest/download/aether-android-arm64.tar.gz"
@@ -20,15 +22,38 @@ jobs:
           BIN=$(find /tmp/aether -type f -name aether | head -n1)
           test -n "$BIN"
           cp "$BIN" libs/arm64-v8a/libaether.so
+          ls -l libs/arm64-v8a
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
+            cmake libffi-dev libssl-dev build-essential
+
+      - name: Install buildozer
+        run: |
+          python -m pip install --upgrade pip
+          pip install buildozer cython==0.29.36 virtualenv setuptools
 
       - name: Build APK
-        id: buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          command: buildozer android debug
-          buildozer_version: stable
+        run: buildozer -v android debug
+
+      - name: List result
+        run: ls -lah bin/
 
       - uses: actions/upload-artifact@v4
         with:
           name: Clubapp-apk
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
+          if-no-files-found: error
